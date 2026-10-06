@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Reviewer Maker</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+--bg:#fff;--tx:#111;--mu:#767676;--ln:#e8e8e8;--hl:#fff3b0}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#111;--tx:#eee;--mu:#8a8a8a;--ln:#2a2a2a;--hl:#5a4d00}}
+:root[data-theme="dark"]{--bg:#111;--tx:#eee;--mu:#8a8a8a;--ln:#2a2a2a;--hl:#5a4d00}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.65 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:680px;margin:0 auto;padding:48px 20px 80px}
+h1{font-size:22px;font-weight:600;letter-spacing:-.01em;margin:0 0 6px}
+.sub{color:var(--mu);margin:0 0 32px}
+#drop{border:1px dashed var(--ln);border-radius:8px;padding:34px 16px;text-align:center;cursor:pointer;color:var(--mu);transition:border-color .15s}
+#drop:hover,#drop.over{border-color:var(--tx);color:var(--tx)}
+#files{color:var(--mu);font-size:13px;margin-top:10px}
+.row{display:flex;flex-wrap:wrap;gap:20px;align-items:center;margin:18px 0 0;font-size:13px;color:var(--mu)}
+select,button{font:inherit;color:var(--tx);background:none;border:0;padding:0}
+select{border-bottom:1px solid var(--ln);padding:2px 4px;border-radius:0}
+button{cursor:pointer}
+#go{background:var(--tx);color:var(--bg);padding:8px 18px;border-radius:6px;font-size:14px;margin-left:auto}
+#go:disabled{opacity:.3;cursor:default}
+#msg{font-size:13px;color:#c0392b;margin-top:10px;min-height:1em}
+#out{margin-top:40px}
+#stat{color:var(--mu);font-size:13px;margin-bottom:14px}
+.tabs{display:flex;gap:22px;border-bottom:1px solid var(--ln);margin-bottom:6px;font-size:14px;flex-wrap:wrap}
+.tabs button{padding:8px 0;color:var(--mu);border-bottom:1px solid transparent;margin-bottom:-1px}
+.tabs button.on{color:var(--tx);border-color:var(--tx)}
+.tabs .r{margin-left:auto}
+.it{padding:16px 0;border-bottom:1px solid var(--ln)}
+.t{font-weight:600}
+.tag{font-weight:400;font-size:11px;color:var(--mu);margin-left:8px;letter-spacing:.04em;text-transform:uppercase}
+.m{margin-top:2px}
+.s{font-size:12.5px;color:var(--mu);margin-top:4px}
+mark{background:var(--hl);color:inherit;padding:0 2px;border-radius:2px}
+h3{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--mu);margin:30px 0 0}
+.q{padding:14px 0;border-bottom:1px solid var(--ln)}
+.o{margin:6px 0 0;color:var(--tx)}
+.a{display:none;margin-top:6px;font-size:13.5px;color:var(--mu)}
+.a b{color:var(--tx)}
+.show .a{display:block}
+.opt{display:block;width:100%;text-align:left;border:1px solid var(--ln);border-radius:6px;padding:9px 12px;margin-top:6px;cursor:pointer}
+.opt:hover{border-color:var(--tx)}.done .opt{cursor:default}.done .opt:hover{border-color:var(--ln)}
+.opt.ok{border-color:#2e9e5b!important;background:rgba(46,158,91,.16)}
+.opt.bad{border-color:#c0392b!important;background:rgba(192,57,43,.16)}
+.chk{display:flex;gap:8px;margin-top:8px}
+.ans{flex:1;min-width:0;font:inherit;color:var(--tx);background:none;border:1px solid var(--ln);border-radius:6px;padding:7px 10px}
+.ck,.rv{border:1px solid var(--ln);border-radius:6px;padding:6px 14px;cursor:pointer}.rv{margin-top:8px}
+.q.ok .ans{border-color:#2e9e5b}.q.bad .ans{border-color:#c0392b}
+#score{margin-left:auto;font-weight:600;color:var(--tx)}
+ul{margin:4px 0 0;padding-left:18px}
+.hide{display:none}
+@media print{.np{display:none!important}.pane{display:block!important}.a{display:block}body{background:#fff;color:#000}}
+</style>
+</head>
+<body>
+<main>
+<h1>Reviewer Maker</h1>
+<p class="sub">Upload many PowerPoint files at once. Get one combined summary, key terms with meanings, and practice exam questions. Everything stays in your browser.</p>
+
+<div class="np">
+  <div id="drop">Drop .pptx files here, or click to choose many at once</div>
+  <input id="inp" type="file" accept=".pptx" multiple hidden>
+  <input id="dir" type="file" webkitdirectory multiple hidden>
+  <div class="row" style="margin-top:10px"><button id="all">Select all</button><button id="none">Deselect all</button><button id="fold">Add folder</button></div>
+  <div id="files"></div>
+  <div class="row">
+    <label>Summary <select id="sum"><option value=".15">Short</option><option value=".3" selected>Medium</option><option value=".5">Long</option></select></label>
+    <label>Terms <select id="nkw"><option>15</option><option selected>25</option><option>40</option></select></label>
+    <label>Questions <select id="nq"><option>10</option><option selected>20</option><option>30</option><option>50</option></select></label>
+    <button id="go" disabled>Create reviewer</button>
+  </div>
+  <div id="msg"></div>
+</div>
+
+<div id="out" class="hide">
+  <div id="stat"></div>
+  <div class="tabs np" id="tabs">
+    <button data-t="m" class="on">Summary</button>
+    <button data-t="k">Key terms</button>
+    <button data-t="s">Slides</button>
+    <button data-t="q">Exam questions</button>
+    <button class="r" onclick="window.print()">Print / PDF</button>
+  </div>
+  <div class="pane" id="m"></div>
+  <div class="pane hide" id="k"></div>
+  <div class="pane hide" id="s"></div>
+  <div class="pane hide" id="q"></div>
+</div>
+</main>
+
+<script>
+const $=id=>document.getElementById(id);
+const STOP=new Set(`a about above across after again against all almost also although always among an and any are as at be because been before being below between both but by can cannot could did do does doing down during each either else etc even every few for from further had has have having he her here hers him his how however i if in into is it its itself just let like made make many may me might more most much must my no nor not now of off on once one only onto or other our out over own per same she should since so some such than that the their them then there these they this those through thus to too two three under until up upon us use used uses using very was we were what when where whether which while who whom whose why will with within without would yet you your slide slides click figure example examples ang ng sa na ay mga at para ito ni kay nang din rin pero kung si sila yung ang`.split(/\s+/));
+const PRON=new Set("this that these those it they there which what who he she we you i here".split(" "));
+const BADT=new Set("note notes example examples objective objectives outline summary reference references definition remember tip answer question conclusion introduction agenda topic topics overview".split(" "));
+const reg=s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+const esc=s=>s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const dec=s=>s.replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&apos;/g,"'").replace(/&amp;/g,'&');
+const words=s=>s.match(/[\p{L}][\p{L}0-9'’-]*/gu)||[];
+const stem=w=>{w=w.toLowerCase();if(w.length>4){if(/ies$/.test(w))return w.slice(0,-3)+'y';if(/(ss|us|is|ous)$/.test(w))return w;if(/s$/.test(w))return w.slice(0,-1)}return w};
+const kOf=t=>words(t).map(stem).join(' ');
+const rx=(t,f='giu')=>{const w=t.trim().split(/\s+/);let l=w.pop();l=/y$/i.test(l)&&l.length>2?reg(l.slice(0,-1))+'(?:y|ies)':reg(l)+'(?:e?s)?';return new RegExp('(?<![\\p{L}\\p{N}])'+[...w.map(reg),l].join('\\s+')+'(?![\\p{L}\\p{N}])',f)};
+const sh=a=>[...a].sort(()=>Math.random()-.5);
+const disp=g=>g.map(w=>/^[A-Z0-9]{2,}$/.test(w)?w:w.toLowerCase()).join(' ');
+let files=[],D=null;
+
+const drop=$('drop'),inp=$('inp');
+drop.onclick=()=>inp.click();
+drop.ondragover=e=>{e.preventDefault();drop.classList.add('over')};
+drop.ondragleave=()=>drop.classList.remove('over');
+drop.ondrop=e=>{e.preventDefault();drop.classList.remove('over');addFiles(e.dataTransfer.files)};
+function addFiles(f){
+  const list=[...f];
+  list.filter(x=>/\.pptx$/i.test(x.name)).forEach(x=>{if(!files.some(y=>y.f.name===x.name&&y.f.size===x.size))files.push({f:x,on:true})});
+  $('msg').textContent=list.length&&!list.some(x=>/\.pptx$/i.test(x.name))?'Only .pptx is supported. Save .ppt files as .pptx first.':'';
+  draw();
+}
+function draw(){
+  $('files').innerHTML=files.map((x,i)=>`<label style="display:block"><input type="checkbox" data-i="${i}" ${x.on?'checked':''}> ${esc(x.f.name)}</label>`).join('');
+  const n=files.filter(x=>x.on).length;
+  $('go').disabled=!n;$('go').textContent=n?`Create reviewer (${n} file${n>1?'s':''})`:'Create reviewer';
+}
+inp.onchange=()=>{addFiles(inp.files);inp.value=''};
+$('dir').onchange=()=>{addFiles($('dir').files);$('dir').value=''};
+$('fold').onclick=()=>$('dir').click();
+$('all').onclick=()=>{files.forEach(x=>x.on=true);draw()};
+$('none').onclick=()=>{files.forEach(x=>x.on=false);draw()};
+$('files').onchange=e=>{const i=e.target.dataset.i;if(i!=null){files[i].on=e.target.checked;draw()}};
+$('sum').onchange=()=>{if(D)summarize()};
+
+/* ---------- reading ---------- */
+const paras=x=>[...x.matchAll(/<a:p(?:\s[^>]*)?>[\s\S]*?<\/a:p>/g)].map(m=>
+  dec([...m[0].replace(/<a:br\s*\/?>/g,'<a:t> </a:t>').matchAll(/<a:t(?:\s[^>]*)?>([\s\S]*?)<\/a:t>/g)].map(t=>t[1]).join('')).replace(/\s+/g,' ').trim()
+).filter(t=>t&&!/^\d{1,3}$/.test(t));
+async function readPptx(file){
+  const zip=await JSZip.loadAsync(file);
+  const names=Object.keys(zip.files).filter(n=>/^ppt\/slides\/slide\d+\.xml$/.test(n)).sort((a,b)=>a.match(/\d+/)[0]-b.match(/\d+/)[0]);
+  const out=[];
+  for(const n of names){
+    const xml=await zip.files[n].async('string');
+    let title='';const lines=[];
+    const rest=xml.replace(/<p:sp(?:\s[^>]*)?>[\s\S]*?<\/p:sp>/g,sp=>{
+      if(/<p:ph[^>]*type="(sldNum|ftr|dt)"/.test(sp))return '';
+      const p=paras(sp);
+      if(/<p:ph[^>]*type="(title|ctrTitle)"/.test(sp)&&!title)title=p.join(' ');else lines.push(...p);
+      return '';});
+    lines.push(...paras(rest));
+    if(!title)title=lines.shift()||'';
+    if(title||lines.length)out.push({file:file.name,n:out.length+1,title,lines});
+  }
+  return out;
+}
+
+$('go').onclick=async()=>{
+  $('msg').textContent='Reading slides…';$('go').disabled=true;
+  try{
+    let slides=[];for(const {f} of files.filter(x=>x.on))slides=slides.concat(await readPptx(f));
+    if(!slides.length)throw new Error('No readable text found. Slides that only contain images cannot be read.');
+    analyze(slides);$('msg').textContent='';
+  }catch(e){$('msg').textContent=e.message}
+  draw();
+};
+
+/* ---------- analysis ---------- */
+function analyze(slides){
+  const st={},defs={},sents=[];
+  const touch=(k,n)=>st[k]||(st[k]={tf:0,sl:new Set(),sf:{},n});
+  slides.forEach((s,si)=>{
+    [[s.title,3],...s.lines.map(l=>[l,1])].forEach(([line,wt])=>{
+      if(!line)return;
+      line.split(/(?<=[.!?])\s+(?=[\p{Lu}0-9])/u).forEach(part=>{
+        const wc=words(part).length;
+        if(wc>=6&&wc<=45)sents.push({t:part.replace(/[.]$/,''),si});
+        let m=part.match(/^([\p{Lu}][^:–—]{1,48}?)\s*[:–—]\s+(.{12,})$/u),term,def;
+        if(m&&words(m[1]).length<=5){term=m[1];def=m[2]}
+        else if((m=part.match(/^(?:(?:the|a|an)\s+)?([\p{L}][\p{L}0-9'’ -]{2,48}?)\s+(?:is|are|refers? to|means|is defined as|are defined as|can be defined as|is known as|is called)\s+(.{10,})$/iu))
+          &&words(m[1]).length<=5&&!PRON.has(words(m[1])[0].toLowerCase())&&words(m[1]).some(w=>!STOP.has(w.toLowerCase()))){term=m[1];def=m[2]}
+        if(term&&!BADT.has(term.trim().toLowerCase())){
+          const k=kOf(term);
+          if(k&&!defs[k])defs[k]={term:term.trim(),def:def.replace(/[.]$/,''),sent:part.replace(/[.]$/,''),si};
+        }
+      });
+      line.split(/[,;:()\[\]–—•]|\s-\s|[.!?](?:\s|$)/).forEach(ch=>{
+        const w=words(ch);
+        for(let i=0;i<w.length;i++)for(let n=1;n<=3&&i+n<=w.length;n++){
+          const g=w.slice(i,i+n),lw=g.map(x=>x.toLowerCase());
+          if(STOP.has(lw[0])||STOP.has(lw[n-1])||/^\d+$/.test(lw.join('')))continue;
+          if(n===1&&g[0].length<4&&!/^[A-Z]{2,}$/.test(g[0]))continue;
+          if(n===3&&STOP.has(lw[1])&&lw[1]!=='of')continue;
+          const k=g.map(stem).join(' '),o=touch(k,n);
+          o.tf+=wt;o.sl.add(si);const d=disp(g);o.sf[d]=(o.sf[d]||0)+1;
+        }
+      });
+    });
+  });
+  Object.entries(defs).forEach(([k,d])=>{const o=touch(k,words(d.term).length);o.tf+=6;o.sl.add(d.si);o.sf[d.term]=99;o.def=1});
+  const cand=Object.entries(st).filter(([k,o])=>o.def||o.tf>=(o.n===1?3:2)).map(([k,o])=>[k,o,
+    o.tf*(1+Math.log(o.sl.size))*(o.n===1?1:o.n===2?1.7:2)+(o.def?25:0)]).sort((a,b)=>b[2]-a[2]);
+  const nkw=+$('nkw').value,kws=[];
+  const sub=(a,b)=>(' '+a+' ').includes(' '+b+' ')||(' '+b+' ').includes(' '+a+' ');
+  for(const [k,o] of cand){
+    if(kws.length>=nkw)break;
+    if(kws.some(x=>sub(x.key,k)))continue;
+    const w=Object.entries(o.sf).sort((a,b)=>b[1]-a[1])[0][0],r=rx(w);
+    let meaning,type,si,def=null;
+    if(defs[k]){meaning=defs[k].sent;type='defined in slides';si=defs[k].si;def=defs[k].def}
+    else{
+      const hit=sents.filter(s=>r.test(s.t)&&!(r.lastIndex=0)).sort((a,b)=>Math.abs(a.t.length-100)-Math.abs(b.t.length-100));
+      if(!hit.length)continue;
+      meaning=hit[0].t;si=hit[0].si;type='from context';
+    }
+    kws.push({w,key:k,meaning,type,si,def,sc:o.sl.size});
+  }
+  if(!kws.length)throw new Error('Not enough text to find key terms.');
+  D={kws,slides,sents};
+  $('stat').textContent=`${slides.length} slides · ${kws.length} key terms`;
+  $('k').innerHTML=kws.map(k=>`<div class="it"><div class="t">${esc(k.w)}<span class="tag">${k.type}</span></div><div class="m">${mark(k.meaning,k.w)}</div><div class="s">Slide ${slides[k.si].n} · ${esc(slides[k.si].title)}</div></div>`).join('');
+  $('s').innerHTML=slides.map(s=>`<div class="it"><div class="t">${esc(s.title)||'(untitled)'}</div><div class="s">${esc(s.file)} · slide ${s.n}</div>${s.lines.length?'<ul>'+s.lines.map(l=>`<li>${esc(l)}</li>`).join('')+'</ul>':''}</div>`).join('');
+  questions();summarize();
+  $('out').classList.remove('hide');$('out').scrollIntoView({behavior:'smooth'});
+}
+function summarize(){
+  const {kws,slides}=D,pct=+$('sum').value,seen=new Set();
+  const rs=kws.map((k,i)=>[rx(k.w,'iu'),kws.length-i]);
+  const hits=t=>rs.reduce((a,[r,w])=>a+(r.test(t)?w:0),0);
+  const trim=t=>t.length<=180?t:t.slice(0,180).replace(/\s+\S*$/,'')+'…';
+  const by={};slides.forEach(s=>(by[s.file]=by[s.file]||[]).push(s));
+  const per=pct>.4?5:pct>.2?4:3;let before=0,after=0,h='';
+  for(const [file,ss] of Object.entries(by)){
+    const sc=ss.map(s=>{const t=[s.title,...s.lines].join(' ');return [s,hits(t)/Math.sqrt(1+words(t).length/20)]});
+    const keep=new Set(sc.slice().sort((a,b)=>b[1]-a[1]).slice(0,Math.max(1,Math.ceil(ss.length*pct))).map(x=>x[0]));
+    let body='';
+    ss.forEach(s=>{
+      before+=s.lines.length+1;
+      if(!keep.has(s))return;
+      const ls=s.lines.map((l,i)=>[l,i,hits(l)+(/[:–—]|\b(is|are|means|refers? to)\b/i.test(l)?8:0)-words(l).length/10])
+        .filter(x=>{const k=kOf(x[0]);return k&&!seen.has(k)}).sort((a,b)=>b[2]-a[2]).slice(0,per).sort((a,b)=>a[1]-b[1]);
+      ls.forEach(x=>seen.add(kOf(x[0])));
+      if(!ls.length&&!s.title)return;
+      after+=ls.length+1;
+      body+=`<div class="it"><div class="t">${esc(s.title)||'(untitled)'}</div>${ls.length?'<ul>'+ls.map(x=>`<li>${esc(trim(x[0]))}</li>`).join('')+'</ul>':''}</div>`;
+    });
+    h+=`<h3>${esc(file.replace(/\.pptx$/i,''))}</h3>`+body;
+  }
+  $('m').innerHTML=`<div class="row np" style="margin:12px 0 0"><span>${Object.keys(by).length} file(s) combined · ${before} lines → ${after}</span><button id="cp" style="margin-left:auto">Copy summary</button></div>
+  <h3>Key terms at a glance</h3><div class="m">${kws.slice(0,15).map(k=>`<mark>${esc(k.w)}</mark>`).join(' ')}</div>`+h;
+  $('cp').onclick=async()=>{try{await navigator.clipboard.writeText($('m').innerText);$('cp').textContent='Copied'}catch(e){$('cp').textContent='Copy failed'}};
+}
+const mark=(t,w)=>esc(t).replace(rx(esc(w)),m=>`<mark>${m}</mark>`);
+
+/* ---------- questions ---------- */
+function questions(){
+  const {kws,slides,sents}=D,N=+$('nq').value,used=new Set(),L='ABCD';
+  const src=k=>`Slide ${slides[k.si].n} · ${esc(slides[k.si].title)}`;
+  const blank=(t,k)=>{const m=t.match(rx(k.w));if(!m||m.length>2)return null;const b=t.replace(rx(k.w),'_______');
+    return b.replace(/_______/g,'').trim().split(/\s+/).length>=5?b:null};
+  const alt=k=>{const r=rx(k.w);return sents.filter(s=>s.t!==k.meaning&&s.t.match(r)).map(s=>s.t)};
+  const nMC=Math.round(N*.35),nID=Math.round(N*.25),nFB=Math.round(N*.2),nEN=Math.round(N*.1),nES=N-nMC-nID-nFB-nEN;
+  const pool=sh(kws);let c=0,h='';
+  const sec=(t,items)=>items.length?`<h3>${t}</h3>`+items.join(''):'';
+  const IN=a=>`<div class="chk np"><input class="ans" placeholder="Type your answer" data-a="${esc(a)}"><button class="ck">Check</button></div>`;
+  const A=(a,k)=>`<div class="a"><b>${a}</b> · ${k?src(k):''}</div>`;
+  const mc=[];
+  for(const k of pool){if(mc.length>=nMC)break;
+    const b=blank(k.meaning,k);if(!b)continue;
+    const sentRx=rx(k.w);
+    const ds=sh(kws.filter(x=>x!==k&&!sub2(x,k)&&!sentRx.test(x.w)&&(!rx(x.w).test(k.meaning)))).sort((a,b2)=>Math.abs(a.w.split(' ').length-k.w.split(' ').length)-Math.abs(b2.w.split(' ').length-k.w.split(' ').length)).slice(0,3);
+    if(ds.length<3)continue;
+    used.add(k);const o=sh([k,...ds]);
+    mc.push(`<div class="q" data-ans="${o.indexOf(k)}">${++c}. ${esc(b)}<div class="o">${o.map((x,i)=>`<button class="opt" data-i="${i}">${L[i]}. ${esc(x.w)}</button>`).join('')}</div>${A(L[o.indexOf(k)]+'. '+esc(k.w),k)}</div>`);}
+  const id=[];
+  for(const k of pool.filter(k=>k.def&&!used.has(k))){if(id.length>=nID)break;
+    const d=k.def;if(rx(k.w).test(d))continue;
+    used.add(k);id.push(`<div class="q">${++c}. Identify the term described as: “${esc(d)}”${IN(k.w)}${A(esc(k.w),k)}</div>`);}
+  const fb=[];
+  for(const k of pool.filter(k=>!used.has(k))){if(fb.length>=nFB+(nID-id.length))break;
+    const b=[...alt(k),k.meaning].map(t=>blank(t,k)).find(Boolean);if(!b)continue;
+    used.add(k);fb.push(`<div class="q">${++c}. ${esc(b)}${IN(k.w)}${A(esc(k.w),k)}</div>`);}
+  const en=sh(slides.filter(s=>s.title&&s.lines.length>=3&&s.lines.length<=8&&s.lines.every(l=>words(l).length<=14))).slice(0,nEN)
+    .map(s=>`<div class="q">${++c}. Enumerate the points listed under “${esc(s.title)}”.<button class="rv np">Show answer</button><div class="a"><ul>${s.lines.map(l=>`<li>${esc(l)}</li>`).join('')}</ul>Slide ${s.n}</div></div>`);
+  const ph=['Explain the meaning and importance of','Discuss in your own words:','Describe, with an example:'];
+  const es=[...kws].sort((a,b)=>b.sc-a.sc).slice(0,Math.max(nES,1)).map((k,i)=>
+    `<div class="q">${++c}. ${ph[i%3]} <b>${esc(k.w)}</b>.<button class="rv np">Show answer</button><div class="a">Reference: ${esc(k.meaning)} · ${src(k)}</div></div>`);
+  $('q').innerHTML=`<div class="row np" style="margin:12px 0 0"><button id="tg">Show / hide answers</button><button id="rg">New set</button><span id="score"></span></div>`+
+    sec('Multiple choice',mc)+sec('Identification',id)+sec('Fill in the blank',fb)+sec('Enumeration',en)+sec('Essay',es);
+  const tot=mc.length+id.length+fb.length,same=(x,y)=>x===y||(' '+x+' ').includes(' '+y+' ')||(' '+y+' ').includes(' '+x+' ');
+  const upd=()=>{const ok=$('q').querySelectorAll('.q.ok').length,n=ok+$('q').querySelectorAll('.q.bad').length;$('score').textContent=`Score ${ok} / ${tot} · ${n} answered`};upd();
+  $('q').onclick=e=>{
+    const t=e.target.closest('button'),q=t&&t.closest('.q');if(!q)return;
+    if(t.classList.contains('rv')){q.classList.add('show');t.remove();return}
+    if(q.classList.contains('done'))return;
+    if(t.classList.contains('opt')){
+      const right=q.dataset.ans;q.classList.add('done','show');
+      q.querySelectorAll('.opt').forEach(b=>{if(b.dataset.i===right)b.classList.add('ok')});
+      if(t.dataset.i===right)q.classList.add('ok');else{t.classList.add('bad');q.classList.add('bad')}
+      upd();
+    }else if(t.classList.contains('ck')){
+      const i=q.querySelector('.ans'),v=kOf(i.value),a=kOf(i.dataset.a);if(!v)return;
+      i.disabled=true;q.classList.add('done','show',same(v,a)?'ok':'bad');upd();
+    }
+  };
+  $('q').addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.classList.contains('ans'))e.target.nextElementSibling.click()});
+  $('tg').onclick=()=>$('q').classList.toggle('show');
+  $('rg').onclick=()=>{questions();$('q').classList.remove('show')};
+}
+const sub2=(a,b)=>(' '+a.key+' ').includes(' '+b.key+' ')||(' '+b.key+' ').includes(' '+a.key+' ');
+
+$('tabs').onclick=e=>{
+  const t=e.target.dataset.t;if(!t)return;
+  [...$('tabs').children].forEach(b=>b.classList.toggle('on',b.dataset.t===t));
+  ['m','k','s','q'].forEach(id=>$(id).classList.toggle('hide',id!==t));
+};
+</script>
+</body>
+</html>
